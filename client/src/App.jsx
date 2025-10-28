@@ -46,8 +46,6 @@ function App() {
     }
   };
 
-  let alex = 10;
-
   const handleDeleteTask = async (taskId) => {
     try {
       await taskService.deleteTask(taskId);

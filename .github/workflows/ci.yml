@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x]
+    env:
+      CI: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ] || [ -f package.json ]; then
+            npm ci
+          else
+            echo "No package.json found — skipping npm install"
+          fi
+
+      - name: Run linter
+        run: |
+          if [ -f package.json ] && npm run -s lint; then
+            echo "Lint passed"
+          else
+            echo "Skipping lint or lint failed"
+            if [ -f package.json ] && grep -q "\"lint\"" package.json; then exit 1; fi
+          fi
+
+      - name: Run tests
+        run: |
+          if [ -f package.json ] && npm test -- --ci; then
+            echo "Tests passed"
+          else
+            echo "No tests or tests failed"
+            if [ -f package.json ] && grep -q "\"test\"" package.json; then exit 1; fi
+          fi
+
+      - name: Build
+        run: |
+          if [ -f package.json ]; then
+            npm run build --if-present
+          else
+            echo "No package.json — skipping build"
+          fi
+
+      - name: Upload build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.node-version }}
+          path: |
+            build
+            dist
+            .output
+          retention-days: 3

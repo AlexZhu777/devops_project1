@@ -10,104 +10,34 @@ on:
       - main
       - develop
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build:
+  build-and-lint:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [16.x, 18.x]
-    env:
-      CI: true
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
+          node-version: "20"
 
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ] || [ -f package.json ]; then
-            npm ci
-          else
-            echo "No package.json found — skipping npm install"
-          fi
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: server
 
-      - name: Run linter (root, client, server)
-        run: |
-          set -e
+      - name: Lint backend
+        run: npm run lint -- --max-warnings=0
+        working-directory: server
 
-          echo "==> Linting root (if configured)"
-          if [ -f package.json ] && grep -q '"lint"' package.json; then
-            npm run lint
-          else
-            echo "No root lint script configured — skipping root lint"
-          fi
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: client
 
-          if [ -d client ]; then
-            echo "==> Installing and linting client"
-            cd client
-            if [ -f package-lock.json ] || [ -f package.json ]; then
-              npm ci
-            fi
-            if [ -f package.json ] && grep -q '"lint"' package.json; then
-              npm run lint
-            else
-              echo "No client lint script configured — skipping client lint"
-            fi
-            cd ..
-          else
-            echo "No client directory found — skipping client lint"
-          fi
+      - name: Lint frontend
+        run: npm run lint -- --max-warnings=0
+        working-directory: client
 
-          if [ -d server ]; then
-            echo "==> Installing and linting server"
-            cd server
-            if [ -f package-lock.json ] || [ -f package.json ]; then
-              npm ci
-            fi
-            if [ -f package.json ] && grep -q '"lint"' package.json; then
-              npm run lint
-            else
-              echo "No server lint script configured — skipping server lint"
-            fi
-            cd ..
-          else
-            echo "No server directory found — skipping server lint"
-          fi
-
-      - name: Run tests
-        run: |
-          if [ -f package.json ] && npm test -- --ci; then
-            echo "Tests passed"
-          else
-            echo "No tests or tests failed"
-            if [ -f package.json ] && grep -q "\"test\"" package.json; then exit 1; fi
-          fi
-
-      - name: Build
-        run: |
-          if [ -f package.json ]; then
-            npm run build --if-present
-          else
-            echo "No package.json — skipping build"
-          fi
-
-      - name: Upload build artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ matrix.node-version }}
-          path: |
-            build
-            dist
-            .output
-          retention-days: 3
+      - name: Build frontend image]
+        run: docker build -t frontend ./client

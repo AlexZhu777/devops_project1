@@ -41,13 +41,47 @@ jobs:
             echo "No package.json found — skipping npm install"
           fi
 
-      - name: Run linter
+      - name: Run linter (root, client, server)
         run: |
-          if [ -f package.json ] && npm run -s lint; then
-            echo "Lint passed"
+          set -e
+
+          echo "==> Linting root (if configured)"
+          if [ -f package.json ] && grep -q '"lint"' package.json; then
+            npm run lint
           else
-            echo "Skipping lint or lint failed"
-            if [ -f package.json ] && grep -q "\"lint\"" package.json; then exit 1; fi
+            echo "No root lint script configured — skipping root lint"
+          fi
+
+          if [ -d client ]; then
+            echo "==> Installing and linting client"
+            cd client
+            if [ -f package-lock.json ] || [ -f package.json ]; then
+              npm ci
+            fi
+            if [ -f package.json ] && grep -q '"lint"' package.json; then
+              npm run lint
+            else
+              echo "No client lint script configured — skipping client lint"
+            fi
+            cd ..
+          else
+            echo "No client directory found — skipping client lint"
+          fi
+
+          if [ -d server ]; then
+            echo "==> Installing and linting server"
+            cd server
+            if [ -f package-lock.json ] || [ -f package.json ]; then
+              npm ci
+            fi
+            if [ -f package.json ] && grep -q '"lint"' package.json; then
+              npm run lint
+            else
+              echo "No server lint script configured — skipping server lint"
+            fi
+            cd ..
+          else
+            echo "No server directory found — skipping server lint"
           fi
 
       - name: Run tests

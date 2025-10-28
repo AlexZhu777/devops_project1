@@ -60,8 +60,6 @@ function App() {
     fetchTasks();
   };
 
-  let var_unused = 42; // Example of an unused variable
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
